@@ -1,0 +1,252 @@
+#define BLYNK_TEMPLATE_ID "TMPL3Cf4YLqfl"
+#define BLYNK_TEMPLATE_NAME "STREETLIGHT"
+#define BLYNK_AUTH_TOKEN "SImx7chp6AXMMmENM-t9f8KrYFhYUAl2"
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <HardwareSerial.h>
+HardwareSerial SIM800C(2);
+#include <LiquidCrystal_I2C.h> 
+LiquidCrystal_I2C lcd(0x27,16,2);
+char auth[] = BLYNK_AUTH_TOKEN;
+char ssid[] = "IOT";
+char pass[] = "12345678";
+#define LED1_PIN 13
+#define LED2_PIN 12
+#define LED3_PIN 14
+#define LDR_PIN 15
+#define FIRE_PIN 4
+#define SHORT_PIN 18
+#define IR1_PIN 34
+#define IR2_PIN 35
+#define IR3_PIN 32
+#define RelayPin1 19
+int flag=0;
+int flagf=0;
+int flags=0;
+BlynkTimer timer;
+void setup() 
+{
+Serial.begin(9600);
+  SIM800C.begin(9600, SERIAL_8N1, 16, 17);
+  delay(1000); // Wait for the module to initialize
+  SIM800C.println("AT+CMGF=1");
+pinMode(LED1_PIN,OUTPUT);
+pinMode(LED2_PIN,OUTPUT);
+pinMode(LED3_PIN,OUTPUT);
+pinMode(RelayPin1,OUTPUT);
+digitalWrite(RelayPin1,LOW);
+pinMode(LDR_PIN,INPUT);
+pinMode(IR1_PIN,INPUT);
+pinMode(IR2_PIN,INPUT);
+pinMode(IR3_PIN,INPUT);
+pinMode(SHORT_PIN,INPUT_PULLUP);
+pinMode(FIRE_PIN,INPUT);
+analogWrite(LED1_PIN,0);
+analogWrite(LED2_PIN,0);
+analogWrite(LED3_PIN,0);
+   delay(1300);
+   lcd.init();
+   lcd.backlight();
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("connecting to");
+   lcd.setCursor(0,1);
+   lcd.print(ssid);
+   Blynk.begin(auth, ssid, pass);   
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("connected to");
+   lcd.setCursor(0,1);
+   lcd.print(ssid);   
+   Serial.println("connected");
+  
+   //timer.setInterval(100,light);  
+   timer.setInterval(100,firede);  
+   timer.setInterval(100,shortde);  
+   timer.setInterval(100,ldrde);
+   delay(2300);
+   lcd.clear();  
+}
+
+void loop() {
+  
+if(flag==0)
+{
+analogWrite(LED1_PIN,255);
+analogWrite(LED2_PIN,255);
+analogWrite(LED3_PIN,255);
+flag=1;
+delay(10000); 
+analogWrite(LED1_PIN,30);
+analogWrite(LED2_PIN,30);
+analogWrite(LED3_PIN,30);
+}
+    Blynk.run();
+    timer.run();
+}
+void firede()
+{
+  int fire=digitalRead(FIRE_PIN);
+  if(fire==0)
+  {
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("    FIRE");
+   lcd.setCursor(0,1);
+   lcd.print("  DETECTED"); 
+   Blynk.virtualWrite(V0,"FIRE DETECTED");
+   if(flagf==0)
+   {
+   smsfire();
+   flagf=1;
+   }
+   delay(2000);
+   lcd.clear();
+  }
+  else
+  {
+     Blynk.virtualWrite(V0,"NO FIRE DETECTED");
+  }
+  
+}
+void shortde()
+{
+   int SH=digitalRead(SHORT_PIN);
+   Serial.println("short circuit value is : "+String(SH));
+  if(SH==0)
+  {
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("  SHORT CIRCUIT");
+   lcd.setCursor(0,1);
+   lcd.print("    DETECTED"); 
+   Blynk.virtualWrite(V1,"SHORT CIRCUIT DETECTED");
+   if(flags==0)
+   {
+   smsshort();
+   flags=1;
+   }
+   delay(2000);
+   lcd.clear();
+  }
+  else
+  {
+     Blynk.virtualWrite(V1,"NO SHORT CIRCUIT DETECTED");
+  } 
+}
+void ldrde()
+{
+    int IO=digitalRead(IR1_PIN); 
+    int IT=digitalRead(IR2_PIN);    
+    int ITR=digitalRead(IR3_PIN);    
+    int L=digitalRead(LDR_PIN);
+    Serial.println("ldr value is : "+String(L));
+  if((L==HIGH)&&(IO==LOW))
+  {
+   
+   Serial.print("LIGHT ONE ON");
+   analogWrite(LED1_PIN,255);
+   Blynk.virtualWrite(V2,"LIGHT ONE ON");
+   delay(3000);   
+   analogWrite(LED2_PIN,30);
+   analogWrite(LED3_PIN,30);
+   analogWrite(LED1_PIN,30);
+  }
+  if((L==HIGH)&&(IT==LOW))
+  {
+   
+    Serial.print("LIGHT TWO ON");
+   analogWrite(LED2_PIN,255);
+   Blynk.virtualWrite(V2,"LIGHT TWO ON");
+   delay(3000);   
+   analogWrite(LED1_PIN,30);
+   analogWrite(LED3_PIN,30);
+   analogWrite(LED2_PIN,30);
+  }
+  if((L==HIGH)&&(ITR==LOW))
+  {  
+    
+    Serial.print("LIGHT THREE ON"); 
+   analogWrite(LED3_PIN,255);
+   Blynk.virtualWrite(V2,"LIGHT THREE ON");
+   delay(3000);
+   analogWrite(LED2_PIN,30);
+   analogWrite(LED1_PIN,30);
+   //delay(3000);   
+   analogWrite(LED3_PIN,30);
+  }
+ if(L==LOW)
+  {
+   Blynk.virtualWrite(V2,"ALL LIGHTS IN 0 INTENSITY");
+   analogWrite(LED1_PIN,30);
+   analogWrite(LED2_PIN,30);
+   analogWrite(LED3_PIN,30);
+  }  
+}
+BLYNK_WRITE(V3)
+{ 
+int a=param.asInt();
+if(a==1)
+{
+  digitalWrite(RelayPin1, HIGH);    
+  Serial.println("line led on");
+}
+else
+{
+  digitalWrite(RelayPin1, LOW);  
+  Serial.println("line led off");    
+}
+}
+//void light()
+//{
+//}
+void smsshort()
+{
+
+   delay(500);
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("SENDING SMS........");
+        delay(500);
+        SIM800C.begin(9600);
+        delay(2000);
+        SIM800C.println("AT+CMGF=1"); 
+        delay(1000);  
+        SIM800C.println("AT+CMGS=\"+917259725217\"\r");
+        delay(1000);
+        SIM800C.println("SHORT @ 12.177151, 76.668729 https://maps.app.goo.gl/HdujB1P3xDSjAtxg8 ");
+         delay(100);
+        SIM800C.println((char)26);
+        delay(1000);
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("MESSAGE SENT");
+   delay(4000);
+   lcd.clear();
+   
+}
+void smsfire()
+{
+   delay(500);
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("SENDING SMS........");
+        delay(500);
+        SIM800C.begin(9600);
+        delay(2000);
+        SIM800C.println("AT+CMGF=1"); 
+        delay(1000);  
+        SIM800C.println("AT+CMGS=\"+917259725217\"\r");
+        delay(1000);
+        SIM800C.println("FIRE @ 12.177151, 76.668729 https://maps.app.goo.gl/HdujB1P3xDSjAtxg8 ");
+         delay(100);
+        SIM800C.println((char)26);
+        delay(1000);
+   lcd.clear();
+   lcd.setCursor(0,0);
+   lcd.print("MESSAGE SENT");
+   delay(4000);
+   lcd.clear();
+}
